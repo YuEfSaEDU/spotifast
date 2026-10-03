@@ -3424,7 +3424,7 @@ mod tests {
 
     #[test]
     fn accessible_tab_reaches_cards_beyond_the_visible_grid() {
-        use crate::ui::widgets::{card, card_row_height, virtual_wrapped_cards};
+        use crate::ui::widgets::{CardCover, card, card_row_height, virtual_wrapped_cards};
         use egui::accesskit::{Action as AccessibleAction, Role};
         let (ctx, mut app) = accessible_app("card-grid");
         let mut reached_last = false;
@@ -3451,8 +3451,7 @@ mod tests {
                                 None,
                                 &format!("Album {index}"),
                                 "Artist",
-                                false,
-                                false,
+                                CardCover::default(),
                             );
                         });
                     });

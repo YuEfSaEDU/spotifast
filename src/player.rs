@@ -882,17 +882,27 @@ fn apply_event(state: &mut LocalState, event: PlayerEvent) -> bool {
             state.track_sequence = state.track_sequence.wrapping_add(1);
             true
         }
-        PlayerEvent::Unavailable { track_id, .. } => set(
-            &mut state.error,
-            Some(format!(
-                "This item isn't available: {}",
-                track_id.to_uri().unwrap_or_default()
-            )),
-        ),
-        PlayerEvent::AudioKeyUnavailable { .. } => set(
-            &mut state.error,
-            Some("Spotify refused the audio key. Try again later".into()),
-        ),
+        PlayerEvent::Unavailable { track_id, .. } => {
+            // A failed load never reaches Playing, so nothing else would
+            // turn the spinner off.
+            let mut changed = set(
+                &mut state.error,
+                Some(format!(
+                    "This item isn't available: {}",
+                    track_id.to_uri().unwrap_or_default()
+                )),
+            );
+            changed |= set(&mut state.loading, false);
+            changed
+        }
+        PlayerEvent::AudioKeyUnavailable { .. } => {
+            let mut changed = set(
+                &mut state.error,
+                Some("Spotify refused the audio key. Try again later".into()),
+            );
+            changed |= set(&mut state.loading, false);
+            changed
+        }
         PlayerEvent::VolumeChanged { volume } => set(&mut state.volume, volume),
         PlayerEvent::SessionConnected { user_name, .. } => {
             let mut changed = set(&mut state.connected, true);
@@ -1509,6 +1519,34 @@ mod tests {
             },
         );
         assert!(!state.loading);
+
+        // A load that fails has no Playing to clear the spinner, so the
+        // failure events must do it themselves.
+        for failure in 4..=5 {
+            apply_event(
+                &mut state,
+                PlayerEvent::Loading {
+                    play_request_id: failure,
+                    track_id: uri(),
+                    position_ms: 0,
+                },
+            );
+            assert!(state.loading);
+            let failed = if failure == 4 {
+                PlayerEvent::Unavailable {
+                    play_request_id: failure,
+                    track_id: uri(),
+                }
+            } else {
+                PlayerEvent::AudioKeyUnavailable {
+                    play_request_id: failure,
+                    track_id: uri(),
+                }
+            };
+            apply_event(&mut state, failed);
+            assert!(!state.loading, "failure {failure} stops the spinner");
+            assert!(state.error.is_some(), "failure {failure} reports why");
+        }
     }
 
     #[test]

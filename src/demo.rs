@@ -6769,6 +6769,33 @@ mod tests {
         app.backend.shutdown();
     }
 
+    /// The cover's control follows its row: the playlist that is playing
+    /// offers pause on its cover, not a restart of the context.
+    #[test]
+    fn clicking_the_cover_of_the_playing_playlist_pauses() {
+        let (ctx, mut app) = accessible_app("sidebar-cover-pause");
+        let view = crate::ui::sidebar::show;
+        view_frame(&ctx, &mut app, vec![], view);
+        let painted = view_frame(&ctx, &mut app, vec![], view);
+        // The demo's remote snapshot plays the "Late night focus" playlist.
+        let name = sidebar_text(&painted, "Late night focus");
+        let cover = egui::pos2(name.left() - 34.0, name.center().y + 9.0);
+        app.actions.clear();
+        let [click, _] = double_click(cover);
+        view_frame(&ctx, &mut app, click, view);
+        assert!(
+            app.actions
+                .iter()
+                .any(|action| matches!(action, Action::TogglePlay)),
+            "the playing playlist's cover pauses"
+        );
+        assert!(
+            played_contexts(&app).is_empty(),
+            "the playing playlist must not be started over"
+        );
+        app.backend.shutdown();
+    }
+
     /// The cover and title in the bottom-left player are a song source, not
     /// just links. The sidebar can therefore receive the same complete row it
     /// receives when a table song is dragged.
